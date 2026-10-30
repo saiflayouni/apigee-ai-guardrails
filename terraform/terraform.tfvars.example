@@ -1,0 +1,5 @@
+project_id              = "your-gcp-project"
+region                  = "us-central1"
+create_apigee_org       = false
+apigee_environment_name = "eval"
+model_armor_template_id = "agent-io-template"

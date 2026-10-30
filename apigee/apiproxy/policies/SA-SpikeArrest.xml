@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SpikeArrest name="SA-SpikeArrest">
+    <DisplayName>Spike Arrest</DisplayName>
+    <Rate>30ps</Rate>
+    <Identifier ref="request.header.x-api-key"/>
+</SpikeArrest>

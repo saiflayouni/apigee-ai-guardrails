@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<APIProxy revision="1" name="agent-tools-proxy">
+    <DisplayName>Agent Tools Proxy</DisplayName>
+    <Description>
+        Fronts every external tool/API call made by the ADK agent. Enforces
+        API key validation, spike arrest, and a Model Armor content-safety
+        shared flow on both request and response.
+    </Description>
+    <BasePaths>/agent-tools</BasePaths>
+    <Policies>
+        <Policy>VA-VerifyAPIKey</Policy>
+        <Policy>SA-SpikeArrest</Policy>
+        <Policy>FC-ModelArmorRequest</Policy>
+        <Policy>FC-ModelArmorResponse</Policy>
+        <Policy>RF-Unauthorized</Policy>
+    </Policies>
+    <ProxyEndpoints>
+        <ProxyEndpoint>default</ProxyEndpoint>
+    </ProxyEndpoints>
+    <TargetEndpoints>
+        <TargetEndpoint>default</TargetEndpoint>
+    </TargetEndpoints>
+</APIProxy>

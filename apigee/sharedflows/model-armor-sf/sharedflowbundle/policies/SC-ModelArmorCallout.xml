@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    gcp.project_id, gcp.location and modelarmor.template_id are populated
+    from the "model-armor-config" KeyValueMap (see terraform/apigee.tf,
+    apigee_keyvaluemap_entries) via a KeyValueMapOperations policy that
+    should run earlier in this shared flow, or hardcode them here for a
+    single-environment demo.
+-->
+<ServiceCallout name="SC-ModelArmorCallout">
+    <DisplayName>Call Model Armor API</DisplayName>
+    <Request variable="modelarmor.request"/>
+    <Response>modelarmor.response</Response>
+    <Timeout>5000</Timeout>
+    <HTTPTargetConnection>
+        <Authentication>
+            <GoogleAccessToken>
+                <Scopes>
+                    <Scope>https://www.googleapis.com/auth/cloud-platform</Scope>
+                </Scopes>
+            </GoogleAccessToken>
+        </Authentication>
+        <URL>https://modelarmor.{gcp.location}.rep.googleapis.com/v1/projects/{gcp.project_id}/locations/{gcp.location}/templates/{modelarmor.template_id}:{modelarmor.method}</URL>
+    </HTTPTargetConnection>
+</ServiceCallout>

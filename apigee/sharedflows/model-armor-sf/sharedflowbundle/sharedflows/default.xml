@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SharedFlow name="default">
+    <Step>
+        <Name>AM-SetModelArmorRequest</Name>
+    </Step>
+    <Step>
+        <Name>SC-ModelArmorCallout</Name>
+    </Step>
+    <Step>
+        <Name>EV-ExtractModelArmorVerdict</Name>
+    </Step>
+    <Step>
+        <Name>RF-ContentBlocked</Name>
+        <Condition>modelarmor.match_state = "MATCH_FOUND"</Condition>
+    </Step>
+    <Step>
+        <Name>ML-CloudLogging</Name>
+    </Step>
+</SharedFlow>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ProxyEndpoint name="default">
+    <Description>Public-facing endpoint called by the ADK agent.</Description>
+
+    <PreFlow name="PreFlow">
+        <Request>
+            <Step>
+                <Name>VA-VerifyAPIKey</Name>
+            </Step>
+            <Step>
+                <Name>SA-SpikeArrest</Name>
+            </Step>
+            <!-- Model Armor shared flow: inspects the inbound request body
+                 (the agent's tool-call arguments) before it reaches the
+                 backend target. See apigee/sharedflows/model-armor-sf. -->
+            <Step>
+                <Name>FC-ModelArmorRequest</Name>
+            </Step>
+        </Request>
+        <Response>
+            <!-- Model Armor shared flow again: inspects the backend's raw
+                 response before it is handed back to the agent, i.e.
+                 trust boundary #3 in the README. -->
+            <Step>
+                <Name>FC-ModelArmorResponse</Name>
+            </Step>
+        </Response>
+    </PreFlow>
+
+    <Flows/>
+
+    <HTTPProxyConnection>
+        <BasePath>/agent-tools</BasePath>
+    </HTTPProxyConnection>
+
+    <RouteRule name="default">
+        <TargetEndpoint>default</TargetEndpoint>
+    </RouteRule>
+
+    <FaultRules>
+        <FaultRule name="unauthorized">
+            <Step>
+                <Name>RF-Unauthorized</Name>
+            </Step>
+            <Condition>fault.name = "FailedToResolveAPIKey" OR fault.name = "InvalidApiKey"</Condition>
+        </FaultRule>
+    </FaultRules>
+</ProxyEndpoint>

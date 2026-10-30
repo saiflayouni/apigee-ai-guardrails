@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtractVariables name="EV-ExtractModelArmorVerdict">
+    <DisplayName>Extract Model Armor Verdict</DisplayName>
+    <Source>modelarmor.response</Source>
+    <JSONPayload>
+        <Variable name="modelarmor.match_state">
+            <JSONPath>$.sanitizationResult.filterMatchState</JSONPath>
+        </Variable>
+    </JSONPayload>
+    <VariablePrefix>modelarmor</VariablePrefix>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+</ExtractVariables>

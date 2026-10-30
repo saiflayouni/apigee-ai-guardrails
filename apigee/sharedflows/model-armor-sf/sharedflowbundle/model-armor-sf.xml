@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SharedFlowBundle revision="1" name="model-armor-sf">
+    <DisplayName>Model Armor Shared Flow</DisplayName>
+    <Description>
+        Reusable flow that calls the Model Armor API on a request or
+        response payload, raises a 403 on a content-safety match, and
+        logs the verdict to Cloud Logging. Invoked from agent-tools-proxy
+        via FlowCallout, once on the request path and once on the
+        response path (direction passed in via the armor.direction
+        FlowCallout parameter).
+    </Description>
+    <Policies>
+        <Policy>AM-SetModelArmorRequest</Policy>
+        <Policy>SC-ModelArmorCallout</Policy>
+        <Policy>EV-ExtractModelArmorVerdict</Policy>
+        <Policy>RF-ContentBlocked</Policy>
+        <Policy>ML-CloudLogging</Policy>
+    </Policies>
+    <SharedFlows>
+        <SharedFlow>default</SharedFlow>
+    </SharedFlows>
+</SharedFlowBundle>

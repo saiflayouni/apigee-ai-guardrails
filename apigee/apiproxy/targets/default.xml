@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TargetEndpoint name="default">
+    <Description>Backend tool/API that the agent is allowed to call.</Description>
+
+    <PreFlow name="PreFlow">
+        <Request/>
+        <Response/>
+    </PreFlow>
+
+    <HTTPTargetConnection>
+        <!-- Replace with the real backend for your tools (Cloud Run,
+             Cloud Functions, an internal API, etc). Kept as a property
+             reference so it can vary per Apigee environment. -->
+        <URL>https://{target.host}</URL>
+    </HTTPTargetConnection>
+</TargetEndpoint>

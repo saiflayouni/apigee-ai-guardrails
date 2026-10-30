@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MessageLogging name="ML-CloudLogging">
+    <DisplayName>Log Verdict to Cloud Logging</DisplayName>
+    <CloudLogging>
+        <LogName>projects/{gcp.project_id}/logs/apigee-model-armor</LogName>
+        <ResourceType>api</ResourceType>
+        <Message contentType="application/json">
+            {
+              "direction": "%armor.direction%",
+              "matchState": "%modelarmor.match_state%",
+              "proxy": "%apiproxy.name%",
+              "clientIp": "%client.ip%",
+              "messageId": "%messageid%"
+            }
+        </Message>
+        <Labels>
+            <Label name="direction" ref="armor.direction"/>
+        </Labels>
+    </CloudLogging>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+</MessageLogging>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AssignMessage name="AM-SetModelArmorRequest">
+    <DisplayName>Build Model Armor Request</DisplayName>
+    <!--
+        armor.direction ("request" or "response") is passed in by the
+        FlowCallout step in agent-tools-proxy/proxies/default.xml.
+        It picks which Model Armor method to call and which payload
+        (inbound request body vs. backend response body) to inspect.
+    -->
+    <AssignVariable>
+        <Name>modelarmor.method</Name>
+        <Template>{armor.direction == "response" ? "sanitizeModelResponse" : "sanitizeUserPrompt"}</Template>
+    </AssignVariable>
+    <AssignVariable>
+        <Name>modelarmor.field</Name>
+        <Template>{armor.direction == "response" ? "modelResponseData" : "userPromptData"}</Template>
+    </AssignVariable>
+    <AssignVariable>
+        <Name>modelarmor.payload_text</Name>
+        <Template>{armor.direction == "response" ? response.content : request.content}</Template>
+    </AssignVariable>
+
+    <AssignTo createNew="true" transport="http" type="request">modelarmor.request</AssignTo>
+    <Set>
+        <Verb>POST</Verb>
+        <Headers>
+            <Header name="Content-Type">application/json</Header>
+        </Headers>
+        <Payload contentType="application/json">
+            {"%modelarmor.field%": {"text": "%modelarmor.payload_text%"}}
+        </Payload>
+    </Set>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+</AssignMessage>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RaiseFault name="RF-Unauthorized">
+    <DisplayName>Raise Fault - Unauthorized</DisplayName>
+    <FaultResponse>
+        <Set>
+            <StatusCode>401</StatusCode>
+            <ReasonPhrase>Unauthorized</ReasonPhrase>
+            <Payload contentType="application/json">{"error": "invalid or missing API key"}</Payload>
+        </Set>
+    </FaultResponse>
+    <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+</RaiseFault>
