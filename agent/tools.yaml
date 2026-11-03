@@ -6,7 +6,7 @@ sources:
     instance: "devfest-db"
     database: "supply_chain_db"
     user: "postgres"
-    password: "DevFest2026!"
+    password: ${DB_PASSWORD}
 
 toolsets:
   supply_chain_toolset:

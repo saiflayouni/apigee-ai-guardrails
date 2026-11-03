@@ -1,145 +1,111 @@
-# apigee-ai-guardrails
+# Guardrails for AI Agents
 
-Defense-in-depth for AI agents on Google Cloud: three independent layers
-that each assume the others might fail.
+A supply-chain assistant demonstrating prompt-injection controls at the gateway and inside the agent. Prepared for DevFest Mexico, Cairo and Ahlen: one English slide deck, recorded demonstrations, no live coding.
 
-Built on top of the Google Codelab
-[Secure your AI agent with Model Armor](https://codelabs.developers.google.com/secure-agent-modelarmor),
-which covers layers 1 and 3. This repo adds **layer 2**: an Apigee X
-proxy sitting between the agent and every external tool/API it calls,
-enforcing its own content-safety, rate-limiting, and auth checks
-independently of the agent process.
+Built on [Google’s secure-agent Model Armor codelab](https://codelabs.developers.google.com/secure-agent-modelarmor). This implementation adapts the database to **Cloud SQL** and adds an incoming **Apigee AI gateway** plus a browser interface. Inspect the original codelab and its license when reusing upstream material.
 
-## Architecture
+## What actually runs
 
+The deployed application starts at **`agent/app.py`**, via `agent/Dockerfile`. It uses Flask, an ADK orchestrator, inventory and logistics specialists, Gemini, and MCP Toolbox for Databases.
+
+```mermaid
+flowchart TD
+    U[Browser] --> G[Apigee AI gateway]
+    G -->|Prompt inspection| M[Model Armor]
+    M -->|Verdict| G
+    G --> A[Cloud Run / ADK]
+    A <--> L[Gemini]
+    A --> T[MCP Toolbox]
+    T --> D[Cloud SQL]
+    T -->|Tool result| C[ADK tool output guard]
+    C -->|Inspection| M
+    C -->|Allowed or replaced result| A
+    A --> O[Application output check]
+    O --> M
+    O --> R[HTTP response]
+    R --> U
 ```
-User ──▶ ADK Agent ──▶ Apigee X Proxy ──▶ External Tool / API
-           │  ▲             │   ▲                 │
-      Model Armor      VerifyAPIKey          (your backend)
-      (direct API      SpikeArrest
-       calls)          model-armor-sf shared flow
-           │                 │
-   after_tool_callback  Cloud Logging
-   (re-check before
-    model sees result)
-```
 
-| Layer | Where | What it does |
+**Scope:** Apigee protects incoming `/secure-agent/chat` requests. The current application does **not** route every internal model or tool call through Apigee. The callback checks tool results after execution and cannot undo side effects.
+
+## Three demonstration scenarios
+
+| Scenario | Input | Previously observed result |
 |---|---|---|
-| 1. Model Armor (direct) | `agent/model_armor_client.py` | Sanitizes the raw user prompt before the model turn, and the final model response before it reaches the user. |
-| 2. Apigee X | `apigee/` | Every tool call the agent makes is routed through an Apigee proxy that validates the API key, applies spike arrest, and runs request/response through a Model Armor shared flow — independently of whatever the agent process does. |
-| 3. `after_tool_callback` | `agent/agent.py` | Intercepts raw tool output *after* it returns from the (already-proxied) tool call and *before* the model reads it, re-running Model Armor on it. Catches content that the proxy's template didn't flag, or that originates from a tool not yet routed through Apigee. |
+| Business question | Ask for laptop inventory | HTTP 200 and a business answer |
+| Direct injection | Ask to override instructions and reveal the system prompt | HTTP 403 with gateway `PROMPT_BLOCKED` |
+| Indirect injection | Retrieve the synthetic supplier note | Tool result withheld by the callback; final HTTP response can still be 200 |
 
-A full diagram lives in [docs/architecture.md](docs/architecture.md).
+These are specific observed tests, not a guarantee against all prompt injection. The supplier note is an intentionally hostile fixture, enabled only with `ENABLE_DEMO_FIXTURE=true`. It does not come from a real supplier record. A dedicated sensitive-output test and scanner-outage test still need validation.
 
-## Threat model: four trust boundaries
+## Repository map
 
-Each layer above exists because a specific boundary can't be trusted to
-sanitize itself.
+| Path | Status and purpose |
+|---|---|
+| `agent/app.py` | Current Flask / ADK application |
+| `agent/templates/index.html` | Frontend actually rendered by Flask |
+| `agent/templates/secure-agent-ui.html` | Earlier alternate UI file; not the active template |
+| `agent/tools.yaml` | Toolbox configuration, with password injected at Toolbox startup |
+| `agent/.env.example` | Current application environment example |
+| `agent/agent.py`, `config.py`, `tools.py`, `model_armor_client.py` | Earlier tool-proxy design, not imported by the current application |
+| `apigee/apiproxy/`, `apigee/sharedflows/` | Earlier `/agent-tools` proxy scaffold, not an export of the deployed `/secure-agent` proxy |
+| `terraform/` | Partial earlier infrastructure scaffold, not a reproduction of the deployed PSC/load-balancer setup |
+| `docs/` | Current architecture, setup, evidence and security notes |
+| `scripts/demo-tests.sh` | Manual API scenarios against your configured gateway |
 
-**1. User → Agent (untrusted input).**
-The user's prompt is attacker-controlled. Risk: direct prompt injection,
-jailbreaks, unsafe content baked into the first turn. Mitigated by
-Model Armor's `sanitizeUserPrompt` call before the agent does anything
-with the input.
+Do not deploy the earlier scaffold expecting it to reproduce the current running demo. The actual Apigee proxy revision must be exported and reviewed first. See [Apigee configuration](docs/apigee.md).
 
-**2. Agent → Apigee proxy (agent-to-gateway).**
-The agent process itself could be compromised, misconfigured, or simply
-buggy — a bad deploy shouldn't mean tool calls go out unauthenticated or
-unbounded. Mitigated by `VerifyAPIKey` (the agent must present a valid
-Apigee app key) and `SpikeArrest` (caps call volume regardless of what
-the agent's own code does).
+## Run the application locally
 
-**3. Apigee proxy → external tool (gateway-to-tool, both directions).**
-The backend tool/API is not fully trusted either way: outbound
-arguments could carry injected instructions meant for the backend
-(SSRF-ish tool abuse), and the backend's response could carry a
-prompt-injection payload meant for the model (e.g. a poisoned
-knowledge-base article). Mitigated by the `model-armor-sf` shared flow
-running on *both* the request and response legs, with every verdict
-logged to Cloud Logging for audit.
-
-**4. Tool output → model context (tool-to-model).**
-Even after boundary 3, the proxy's Model Armor template may not match
-the agent's own safety bar, and not every tool is guaranteed to be
-routed through Apigee in every deployment. `after_tool_callback` is the
-last checkpoint before tool output enters the model's context window —
-it treats tool output as untrusted input one more time, independent of
-what already ran upstream, and can withhold it entirely.
-
-The point of running Model Armor three times (boundaries 1, 3, and 4) is
-that each check is enforced by a *different* component, so one
-misconfigured or bypassed layer doesn't take down the whole defense.
-
-## Repo layout
-
-```
-agent/      ADK agent: after_tool_callback, Model Armor client, tool defs
-apigee/     Apigee X proxy bundle + model-armor-sf shared flow bundle
-terraform/  Optional: APIs, Model Armor template, Apigee KVM config
-docs/       Architecture diagram source + rendered doc
-```
-
-## Setup
-
-### Prerequisites
-
-- A GCP project with billing enabled
-- An existing Apigee X organization and environment (or set
-  `create_apigee_org = true` in `terraform/variables.tf` for a from-scratch
-  demo — see the caveats in `terraform/apigee.tf`)
-- `gcloud`, [`apigeecli`](https://github.com/apigee/apigeecli), `terraform` (optional), Python 3.11+
-- Model Armor API enabled (`modelarmor.googleapis.com`)
-
-### 1. Infra (optional, via Terraform)
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars   # fill in your project id
-terraform init
-terraform apply
-```
-
-This enables the required APIs, creates the Model Armor template, and
-seeds the `model-armor-config` KVM the shared flow reads from. Skip it
-and create those by hand (`gcloud model-armor templates create`,
-`apigeecli kvms create`) if you'd rather not run Terraform against an
-existing Apigee org.
-
-### 2. Deploy the Apigee bundle
-
-```bash
-cd apigee
-
-# shared flow first — the proxy's FlowCallout policies depend on it
-apigeecli sharedflows create -f sharedflows/model-armor-sf/sharedflowbundle \
-  --name model-armor-sf --org $APIGEE_ORG --token $(gcloud auth print-access-token)
-apigeecli sharedflows deploy --name model-armor-sf --env $APIGEE_ENV \
-  --org $APIGEE_ORG --token $(gcloud auth print-access-token) --ovr
-
-apigeecli apis create -f apiproxy --name agent-tools-proxy \
-  --org $APIGEE_ORG --token $(gcloud auth print-access-token)
-apigeecli apis deploy --name agent-tools-proxy --env $APIGEE_ENV \
-  --org $APIGEE_ORG --token $(gcloud auth print-access-token) --ovr
-```
-
-Then create an Apigee developer + app to get the API key the agent will
-send as `x-api-key` (`apigeecli apps create` / the Apigee UI).
-
-### 3. Run the agent
+Requires Python 3.11, Google Application Default Credentials, access to a configured Model Armor template, a reachable Toolbox service and model credentials. Toolbox and the SQL schema/data must already exist.
 
 ```bash
 cd agent
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in project id, Model Armor template id,
-                       # Apigee proxy URL, and the app key from step 2
-adk run agent
+cp .env.example .env
+# Edit .env locally. Never commit its secret values.
+gcloud auth application-default login
+python app.py
 ```
 
-## Reference
+The app listens on port 8080 by default. `POST /chat` is the Flask endpoint. Through Apigee, its path is `/secure-agent/chat`.
 
-- Base codelab: [Secure your AI agent with Model Armor](https://codelabs.developers.google.com/secure-agent-modelarmor)
-- [Model Armor overview](https://cloud.google.com/security-command-center/docs/model-armor-overview)
-- [Apigee X shared flows](https://cloud.google.com/apigee/docs/api-platform/fundamentals/shared-flows)
-- [ADK: tool callbacks](https://google.github.io/adk-docs/)
+The browser UI is designed for the deployed Apigee origin. Outside that origin it defaults to a clearly labelled sample preview, with illustrative responses. This preview performs no security test. Do not disable CORS to make cross-origin live calls work. Use the gateway-hosted UI or deliberately configure and test an allowed origin. The current frontend contains the original demo hostname; adapt it before using another environment.
+
+## Configure Toolbox separately
+
+`agent/tools.yaml` belongs to the **Toolbox server**. The Flask process only uses `TOOLBOX_SERVER` to connect to it. Set `DB_PASSWORD` on the Toolbox process, preferably from Secret Manager in Cloud Run. Loading `.env` in Flask does not configure a separate Toolbox service. The existing YAML schema must match your Toolbox server version.
+
+See [Setup and deployment](docs/setup.md) for configuration and deployment boundaries. The repository does not provision a database schema or load sample data automatically.
+
+## Run the manual scenarios
+
+```bash
+export GATEWAY_URL='https://YOUR_GATEWAY_HOST/secure-agent'
+bash scripts/demo-tests.sh
+```
+
+Each run uses distinct sessions. Confirm blocks with gateway Debug or callback logs, not HTTP status alone. A successful final response does not mean that every tool result was allowed. Do not run the fixture scenario in an environment where it is disabled and expect a tool-block result.
+
+## Evidence and limitations
+
+The frontend displays only final response data and optional structured security events. The current backend does not emit those events, so internal stages may say **Not observed**. This is not a live end-to-end trace. Client-generated request IDs are not server correlation IDs unless the server implements that contract.
+
+- The application inspects input and output and serializes tool results for inspection.
+- On an inspection exception it withholds content. The current matching logic does not prove every individual filter completed successfully.
+- The tool guard returns a replacement error to the model; it does not itself guarantee an HTTP 403 for the full request.
+- Session and memory services are in-memory and do not survive restarts or coordinate across instances.
+- The current app uses the Flask development server. It is a demonstration, not a production deployment blueprint.
+- Gateway-to-backend identity protects access only when Cloud Run actually enforces it. Verify current IAM and invoker-check settings. Do not infer backend privacy from older tests.
+- API keys, rate limiting, token budgets, semantic caching and model failover are not demonstrated by the current incoming proxy configuration.
+
+See [Architecture](docs/architecture.md), [demo evidence](docs/demo.md), and [security notes](SECURITY.md).
+
+## References
+
+- [Secure-agent Model Armor codelab](https://codelabs.developers.google.com/secure-agent-modelarmor)
+- [ADK documentation](https://google.github.io/adk-docs/)
+- [Model Armor with Apigee](https://cloud.google.com/model-armor/model-armor-apigee-integration)
+- [MCP Toolbox](https://googleapis.github.io/genai-toolbox/)
