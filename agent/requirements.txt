@@ -1,3 +1,6 @@
-google-adk>=0.1.0
-google-auth>=2.29.0
-requests>=2.31.0
+flask==3.0.3
+google-adk==1.35.2
+google-cloud-modelarmor==0.2.0
+toolbox-core==1.4.0
+python-dotenv==1.0.1
+google-genai==1.75.0

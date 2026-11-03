@@ -1,0 +1,77 @@
+sources:
+  supply_chain_db:
+    kind: "cloud-sql-postgres"
+    project: "devfest-demo-2026"
+    region: "us-central1"
+    instance: "devfest-db"
+    database: "supply_chain_db"
+    user: "postgres"
+    password: "DevFest2026!"
+
+toolsets:
+  supply_chain_toolset:
+    - search_products_by_context
+    - check_inventory_levels
+    - track_shipment_status
+    - analyze_supply_chain_risk
+
+tools:
+  search_products_by_context:
+    kind: postgres-sql
+    source: supply_chain_db
+    description: "Search products by name, category, or description keyword"
+    parameters:
+      - name: keyword
+        type: string
+        description: "Search keyword"
+    statement: |
+      SELECT name, category, quantity, supplier, description
+      FROM products
+      WHERE name ILIKE '%' || $1 || '%'
+         OR category ILIKE '%' || $1 || '%'
+         OR description ILIKE '%' || $1 || '%'
+      LIMIT 5;
+
+  check_inventory_levels:
+    kind: postgres-sql
+    source: supply_chain_db
+    description: "Check current inventory quantity for a product"
+    parameters:
+      - name: product_name
+        type: string
+        description: "Product name to check"
+    statement: |
+      SELECT name, category, quantity, supplier
+      FROM products
+      WHERE name ILIKE '%' || $1 || '%'
+      LIMIT 5;
+
+  track_shipment_status:
+    kind: postgres-sql
+    source: supply_chain_db
+    description: "Track shipment status for a destination or product"
+    parameters:
+      - name: keyword
+        type: string
+        description: "Destination city or product name"
+    statement: |
+      SELECT p.name as product, s.destination, s.status, s.eta
+      FROM shipments s
+      JOIN products p ON s.product_id = p.id
+      WHERE s.destination ILIKE '%' || $1 || '%'
+         OR p.name ILIKE '%' || $1 || '%'
+      LIMIT 5;
+
+  analyze_supply_chain_risk:
+    kind: postgres-sql
+    source: supply_chain_db
+    description: "Analyze supply chain risks: delayed shipments and low stock"
+    parameters: []
+    statement: |
+      SELECT p.name as product, s.destination, s.status, s.eta,
+             p.quantity,
+             CASE WHEN p.quantity < 50 THEN 'LOW STOCK' ELSE 'OK' END as stock_risk
+      FROM shipments s
+      JOIN products p ON s.product_id = p.id
+      WHERE s.status != 'Delivered'
+      ORDER BY s.eta ASC;

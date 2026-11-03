@@ -22,3 +22,14 @@ terraform/crash.log
 
 # graphify knowledge-graph output (local tool artifact, not part of the repo)
 graphify-out/
+
+# Local backups and secrets
+*.before-*
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+
+*.backup
